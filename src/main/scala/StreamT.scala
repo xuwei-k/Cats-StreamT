@@ -1,12 +1,9 @@
 package cats
 package data
 
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import scala.reflect.ClassTag
-
-import scala.annotation.tailrec
-import scala.collection.mutable
+import scalaprops.Gen
+import scalaz._
+import scalaz.syntax.monad._
 
 sealed abstract class StreamT[F[_], A] { lhs =>
 
@@ -117,26 +114,6 @@ sealed abstract class StreamT[F[_], A] { lhs =>
     } yield (lo, ro) match {
       case (Some((a, ta)), Some((b, tb))) =>
         This((a, b), ev.pure(ta zip tb))
-      case _ =>
-        Empty()
-    })
-
-  /**
-   * Lazily zip two streams together using Ior.
-   *
-   * Unlike `zip`, the length of the result will be the longer of the
-   * two arguments.
-   */
-  def izip[B](rhs: StreamT[F, B])(implicit ev: Monad[F]): StreamT[F, Ior[A, B]] =
-    Next(for {
-      lo <- lhs.uncons; ro <- rhs.uncons
-    } yield (lo, ro) match {
-      case (Some((a, ta)), Some((b, tb))) =>
-        This(Ior.both(a, b), ev.pure(ta izip tb))
-      case (Some(_), None) =>
-        lhs.map(a => Ior.left(a))
-      case (None, Some(_)) =>
-        rhs.map(b => Ior.right(b))
       case _ =>
         Empty()
     })
@@ -266,6 +243,31 @@ sealed abstract class StreamT[F[_], A] { lhs =>
 }
 
 object StreamT {
+
+  implicit def equal[F[_]: Monad, A](
+    implicit E: shapeless.Lazy[Equal[F[Option[(A, cats.data.StreamT[F, A])]]]]
+  ): Equal[StreamT[F, A]] = scalaz.Equal.equal{
+    (a, b) =>
+      E.value.equal(a.uncons, b.uncons)
+  }
+
+  implicit def gen[F[_]: Applicative, A](implicit
+    A: Gen[A], F: shapeless.Lazy[Gen[F[StreamT[F, A]]]]
+  ): Gen[StreamT[F, A]] =
+    Gen.oneOf(
+      Gen.value(StreamT.empty[F, A]),
+      A.map(StreamT(_)),
+      scalaz.Apply[Gen].apply2(A, F.value)(StreamT.cons(_, _))
+    )
+
+
+  implicit def instance[F[_]: Applicative]: Monad[({type l[a] = cats.data.StreamT[F, a]})#l] =
+    new Monad[({type l[a] = StreamT[F, a]})#l] {
+      override def point[A](a: => A) = cats.data.StreamT.apply(a)
+
+      override def bind[A, B](fa: StreamT[F, A])(f: A => StreamT[F, B]) =
+        fa flatMap f
+    }
 
   /**
    * Concrete Stream[A] types:
