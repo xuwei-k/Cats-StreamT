@@ -1,6 +1,6 @@
 scalaVersion := "2.11.7"
 
-name := "cas-streamT"
+name := "cats-streamT"
 
 libraryDependencies += "com.chuusai" %% "shapeless" % "2.2.5"
 libraryDependencies += "com.github.scalaprops" %% "scalaprops-gen" % scalapropsVersion.value
