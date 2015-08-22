@@ -8,8 +8,10 @@ import scalaz.std.tuple._
 
 object StreamTTest extends Scalaprops {
 
-  type StreamTIList[A] = cats.data.StreamT[IList, A]
+  type StreamTIList[A] = cats.data.StreamingT[IList, A]
 
-  val laws = scalazlaws.monad.all[StreamTIList].andThenParam(Param.maxSize(2))
+  override def param = super.param.copy(maxSize = 2, rand = Rand.standard(1))
+
+  val laws = scalazlaws.monad.all[StreamTIList]
 
 }
